@@ -2,102 +2,96 @@ import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 
 export default function LoadsPage() {
-  const [loads, setLoads] = useState([]);
-  const [filterDate, setFilterDate] = useState("");
-  const [filterDriver, setFilterDriver] = useState("");
+  const [data, setData] = useState([]);
+  const [puDateFilter, setPuDateFilter] = useState("");
+  const [driverFilter, setDriverFilter] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("loads");
-    if (saved) setLoads(JSON.parse(saved));
+    if (saved) setData(JSON.parse(saved));
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("loads", JSON.stringify(loads));
-  }, [loads]);
+    localStorage.setItem("loads", JSON.stringify(data));
+  }, [data]);
 
-  const handleFile = (e) => {
+  const handleFile = async (e) => {
     const file = e.target.files[0];
     const reader = new FileReader();
-
     reader.onload = (evt) => {
-      const data = new Uint8Array(evt.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheet = workbook.Sheets[workbook.SheetNames[0]];
-      const json = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+      const bstr = evt.target.result;
+      const wb = XLSX.read(bstr, { type: "binary" });
+      const wsname = wb.SheetNames[0];
+      const ws = wb.Sheets[wsname];
+      const parsedData = XLSX.utils.sheet_to_json(ws, { raw: false });
 
-      const formatted = json.map((row) => {
-        const formatExcelDate = (excelDate) => {
-          const jsDate = XLSX.SSF.parse_date_code(excelDate);
+      const formatted = parsedData.map((row) => {
+        const parseExcelDate = (excelDate) => {
+          const jsDate = XLSX.SSF.parse_date_code(parseFloat(excelDate));
           if (!jsDate) return { date: "", time: "" };
-
-          const pad = (n) => String(n).padStart(2, '0');
-          const date = `${jsDate.y}-${pad(jsDate.m)}-${pad(jsDate.d)}`;
-          const time = `${pad(jsDate.H)}:${pad(jsDate.M)}`;
-          return { date, time };
+          const date = new Date(jsDate.y, jsDate.m - 1, jsDate.d);
+          const time = `${String(jsDate.HH).padStart(2, "0")}:${String(jsDate.MM).padStart(2, "0")}`;
+          return { date: date.toISOString().split("T")[0], time };
         };
 
-        const pu = formatExcelDate(row["Stop 1  Actual Arrival Time"]);
-        const del = formatExcelDate(row["Stop 2  Actual Arrival Time"]);
+        const pu = parseExcelDate(row["Stop 1 Actual Arrival Date"]);
+        const del = parseExcelDate(row["Stop 2 Actual Arrival Date"]);
 
         return {
-          driver: row["Driver Name"],
-          loadId: row["Load ID"],
-          puLocation: row["Stop 1"],
+          driver: row["Driver Name"] || "",
+          load: row["Load ID"] || "",
+          puLocation: row["Stop 1"] || "",
           puDate: pu.date,
           puTime: pu.time,
-          delLocation: row["Stop 2"],
+          delLocation: row["Stop 2"] || "",
           delDate: del.date,
           delTime: del.time,
-          miles: parseFloat(row["Distance in Miles"] || 0),
-          rate: parseFloat(row["Total Pay"] || 0),
+          miles: parseFloat(row["Estimated Cost"]) || 0,
+          rate: parseFloat(row["Estimated Cost"]) || 0,
         };
       });
 
-      setLoads(formatted);
+      setData(formatted);
     };
-
-    reader.readAsArrayBuffer(file);
+    reader.readAsBinaryString(file);
   };
 
-  const saveToLocal = () => {
-    localStorage.setItem("loads", JSON.stringify(loads));
+  const handleSave = () => {
+    localStorage.setItem("loads", JSON.stringify(data));
+    alert("Data saved");
   };
 
-  const deleteRow = (index) => {
-    const updated = [...loads];
-    updated.splice(index, 1);
-    setLoads(updated);
+  const handleDelete = (index) => {
+    const copy = [...data];
+    copy.splice(index, 1);
+    setData(copy);
   };
 
-  const filteredLoads = loads.filter((load) => {
-    return (
-      (!filterDate || load.puDate === filterDate) &&
-      (!filterDriver || load.driver.toLowerCase().includes(filterDriver.toLowerCase()))
-    );
-  });
+  const filteredData = data.filter(
+    (row) =>
+      (!puDateFilter || row.puDate === puDateFilter) &&
+      (!driverFilter || row.driver.toLowerCase().includes(driverFilter.toLowerCase()))
+  );
 
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Upload Load Report</h1>
-      <input type="file" onChange={handleFile} className="mb-2" />
-      <button onClick={saveToLocal} className="ml-2 px-3 py-1 border rounded">Save</button>
-      <div className="my-2">
-        <input
-          type="date"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-          className="border px-2 py-1 mr-2"
-          placeholder="Filter by PU Date"
-        />
-        <input
-          type="text"
-          value={filterDriver}
-          onChange={(e) => setFilterDriver(e.target.value)}
-          className="border px-2 py-1"
-          placeholder="Filter by Driver"
-        />
-      </div>
-      <table className="w-full table-auto border">
+      <input type="file" accept=".xlsx, .xls" onChange={handleFile} className="mb-4" />
+      <button onClick={handleSave}>Save</button>
+      <input
+        type="date"
+        value={puDateFilter}
+        onChange={(e) => setPuDateFilter(e.target.value)}
+        placeholder="Filter by PU Date"
+      />
+      <input
+        type="text"
+        value={driverFilter}
+        onChange={(e) => setDriverFilter(e.target.value)}
+        placeholder="Filter by Driver"
+      />
+
+      <table className="table-auto w-full mt-4 border">
         <thead>
           <tr>
             <th>Driver</th>
@@ -114,20 +108,20 @@ export default function LoadsPage() {
           </tr>
         </thead>
         <tbody>
-          {filteredLoads.map((load, idx) => (
-            <tr key={idx}>
-              <td>{load.driver}</td>
-              <td>{load.loadId}</td>
-              <td>{load.puLocation}</td>
-              <td>{load.puDate}</td>
-              <td>{load.puTime}</td>
-              <td>{load.delLocation}</td>
-              <td>{load.delDate}</td>
-              <td>{load.delTime}</td>
-              <td>{load.miles}</td>
-              <td>{load.rate}</td>
+          {filteredData.map((row, i) => (
+            <tr key={i}>
+              <td>{row.driver}</td>
+              <td>{row.load}</td>
+              <td>{row.puLocation}</td>
+              <td>{row.puDate}</td>
+              <td>{row.puTime}</td>
+              <td>{row.delLocation}</td>
+              <td>{row.delDate}</td>
+              <td>{row.delTime}</td>
+              <td>{row.miles}</td>
+              <td>{row.rate}</td>
               <td>
-                <button onClick={() => deleteRow(idx)} className="text-red-600 font-bold">✕</button>
+                <button onClick={() => handleDelete(i)}>✘</button>
               </td>
             </tr>
           ))}
