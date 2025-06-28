@@ -1,9 +1,28 @@
-
 import { useState } from "react";
 import * as XLSX from "xlsx";
 
 export default function ExcelUploadTable() {
   const [data, setData] = useState([]);
+
+  const excelDateToDate = (serial) => {
+    if (!serial) return "";
+    const utc_days = Math.floor(serial - 25569);
+    const utc_value = utc_days * 86400;
+    const date_info = new Date(utc_value * 1000);
+    return date_info.toISOString().split("T")[0];
+  };
+
+  const excelTimeToTime = (value) => {
+    if (!value && value !== 0) return "";
+    const totalSeconds = Math.floor(86400 * value);
+    const hours = Math.floor(totalSeconds / 3600)
+      .toString()
+      .padStart(2, "0");
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+      .toString()
+      .padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -21,11 +40,11 @@ export default function ExcelUploadTable() {
           driver: row["Driver Name"] || "",
           load: row["Load ID"] || "",
           pu_location: row["Stop 1"] || "",
-          pu_date: row["Stop 1 Actual Departure Date"] || "",
-          pu_time: row["Stop 1  Actual Arrival Time"] || "",
+          pu_date: excelDateToDate(row["Stop 1 Actual Departure Date"]),
+          pu_time: excelTimeToTime(row["Stop 1  Actual Arrival Time"]),
           del_location: row["Stop 2"] || "",
-          del_date: row["Stop 2  Actual Arrival Date"] || "",
-          del_time: row["Stop 2  Actual Arrival Time"] || "",
+          del_date: excelDateToDate(row["Stop 2  Actual Arrival Date"]),
+          del_time: excelTimeToTime(row["Stop 2  Actual Arrival Time"]),
           miles: row["Estimated Cost"] || 0,
           rate: rate.toFixed(2),
         };
@@ -77,4 +96,4 @@ export default function ExcelUploadTable() {
       )}
     </div>
   );
-}
+} 
