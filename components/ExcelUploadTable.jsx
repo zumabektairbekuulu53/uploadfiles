@@ -3,6 +3,10 @@ import * as XLSX from "xlsx";
 
 export default function ExcelUploadTable() {
   const [data, setData] = useState([]);
+  const [activeTab, setActiveTab] = useState("loads");
+  const [drivers, setDrivers] = useState([]);
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
 
   const excelDateToDate = (serial) => {
     if (!serial) return "";
@@ -55,45 +59,97 @@ export default function ExcelUploadTable() {
     reader.readAsBinaryString(file);
   };
 
-  return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-4">Upload Load Report</h1>
-      <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="mb-4" />
+  const addDriver = () => {
+    if (firstName && lastName) {
+      setDrivers([...drivers, `${firstName} ${lastName}`]);
+      setFirstName("");
+      setLastName("");
+    }
+  };
 
-      {data.length > 0 && (
-        <table className="min-w-full border text-sm">
-          <thead>
-            <tr className="bg-gray-100 text-left">
-              <th className="border p-2">Driver</th>
-              <th className="border p-2">Load #</th>
-              <th className="border p-2">PU Location</th>
-              <th className="border p-2">PU Date</th>
-              <th className="border p-2">PU Time</th>
-              <th className="border p-2">Del Location</th>
-              <th className="border p-2">Del Date</th>
-              <th className="border p-2">Del Time</th>
-              <th className="border p-2">Miles</th>
-              <th className="border p-2">Rate ($)</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((row, idx) => (
-              <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                <td className="border px-2 py-1">{row.driver}</td>
-                <td className="border px-2 py-1">{row.load}</td>
-                <td className="border px-2 py-1">{row.pu_location}</td>
-                <td className="border px-2 py-1">{row.pu_date}</td>
-                <td className="border px-2 py-1">{row.pu_time}</td>
-                <td className="border px-2 py-1">{row.del_location}</td>
-                <td className="border px-2 py-1">{row.del_date}</td>
-                <td className="border px-2 py-1">{row.del_time}</td>
-                <td className="border px-2 py-1">{row.miles}</td>
-                <td className="border px-2 py-1">{row.rate}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+  return (
+    <div className="flex">
+      <div className="w-48 h-screen bg-gray-100 p-4 space-y-4">
+        <h2 className="text-lg font-semibold">Menu</h2>
+        <ul className="space-y-2">
+          <li className="hover:underline cursor-pointer" onClick={() => setActiveTab("loads")}>Loads</li>
+          <li className="hover:underline cursor-pointer" onClick={() => setActiveTab("drivers")}>Drivers</li>
+          <li className="hover:underline cursor-pointer" onClick={() => setActiveTab("trucks")}>Trucks</li>
+          <li className="hover:underline cursor-pointer" onClick={() => setActiveTab("payroll")}>Payroll</li>
+        </ul>
+      </div>
+
+      <div className="flex-1 p-6">
+        {activeTab === "loads" && (
+          <>
+            <h1 className="text-2xl font-bold mb-4">Upload Load Report</h1>
+            <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="mb-4" />
+
+            {data.length > 0 && (
+              <table className="min-w-full border text-sm">
+                <thead>
+                  <tr className="bg-gray-100 text-left">
+                    <th className="border p-2">Driver</th>
+                    <th className="border p-2">Load #</th>
+                    <th className="border p-2">PU Location</th>
+                    <th className="border p-2">PU Date</th>
+                    <th className="border p-2">PU Time</th>
+                    <th className="border p-2">Del Location</th>
+                    <th className="border p-2">Del Date</th>
+                    <th className="border p-2">Del Time</th>
+                    <th className="border p-2">Miles</th>
+                    <th className="border p-2">Rate ($)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.map((row, idx) => (
+                    <tr key={idx} className="odd:bg-white even:bg-gray-50">
+                      <td className="border px-2 py-1">{row.driver}</td>
+                      <td className="border px-2 py-1">{row.load}</td>
+                      <td className="border px-2 py-1">{row.pu_location}</td>
+                      <td className="border px-2 py-1">{row.pu_date}</td>
+                      <td className="border px-2 py-1">{row.pu_time}</td>
+                      <td className="border px-2 py-1">{row.del_location}</td>
+                      <td className="border px-2 py-1">{row.del_date}</td>
+                      <td className="border px-2 py-1">{row.del_time}</td>
+                      <td className="border px-2 py-1">{row.miles}</td>
+                      <td className="border px-2 py-1">{row.rate}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+
+        {activeTab === "drivers" && (
+          <div>
+            <h1 className="text-2xl font-bold mb-4">Driver List</h1>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                placeholder="First Name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                className="border p-2"
+              />
+              <input
+                type="text"
+                placeholder="Last Name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                className="border p-2"
+              />
+              <button onClick={addDriver} className="bg-blue-500 text-white px-4 py-2 rounded">Add Driver</button>
+            </div>
+            <ul className="list-disc pl-6">
+              {drivers.map((driver, index) => (
+                <li key={index}>{driver}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
-} 
+}
