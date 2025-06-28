@@ -14,13 +14,13 @@ export default function LoadsPage() {
   }, []);
 
   const excelDateToJS = (serial) => {
-    if (!serial) return "";
+    if (!serial || isNaN(serial)) return "";
     const date = addDays(new Date(1899, 11, 30), Math.floor(serial));
     return format(date, "MM/dd/yyyy");
   };
 
   const excelTimeToString = (decimal) => {
-    if (!decimal) return "";
+    if (!decimal || isNaN(decimal)) return "";
     const totalSeconds = Math.round(24 * 60 * 60 * decimal);
     const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, "0");
     const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0");
