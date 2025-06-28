@@ -8,7 +8,6 @@ import {
   isWithinInterval,
   parseISO,
 } from "date-fns";
-import html2pdf from "html2pdf.js";
 
 export default function PayrollFull() {
   const [loads, setLoads] = useState([]);
@@ -51,8 +50,10 @@ export default function PayrollFull() {
 
   const netTotal = grossTotal + additionsTotal - deductionsTotal;
 
-  const downloadPDF = () => {
+  const downloadPDF = async () => {
+    const html2pdf = (await import("html2pdf.js")).default;
     const element = pdfRef.current;
+    if (!element || !html2pdf) return;
     const opt = {
       margin: 0.5,
       filename: `${driver}_statement_${weekLabel().replace(/ /g, "")}.pdf`,
