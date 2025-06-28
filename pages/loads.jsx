@@ -1,94 +1,97 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import * as XLSX from "xlsx";
 
 export default function LoadsPage() {
-  const [data, setData] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [fileName, setFileName] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+  const [filterDriver, setFilterDriver] = useState("");
 
-  const excelDateToDate = (serial) => {
-    if (!serial) return "";
-    const utc_days = Math.floor(serial - 25569);
-    const utc_value = utc_days * 86400;
-    const date_info = new Date(utc_value * 1000);
-    return date_info.toISOString().split("T")[0];
-  };
+  useEffect(() => {
+    const saved = localStorage.getItem("loads");
+    if (saved) setRows(JSON.parse(saved));
+  }, []);
 
-  const excelTimeToTime = (value) => {
-    if (!value && value !== 0) return "";
-    const totalSeconds = Math.floor(86400 * value);
-    const hours = Math.floor(totalSeconds / 3600)
-      .toString()
-      .padStart(2, "0");
-    const minutes = Math.floor((totalSeconds % 3600) / 60)
-      .toString()
-      .padStart(2, "0");
-    return `${hours}:${minutes}`;
-  };
-
-  const handleFileUpload = (e) => {
+  const handleFile = async (e) => {
     const file = e.target.files[0];
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      const bstr = evt.target.result;
-      const wb = XLSX.read(bstr, { type: "binary" });
-      const sheetName = wb.SheetNames[0];
-      const ws = wb.Sheets[sheetName];
-      const raw = XLSX.utils.sheet_to_json(ws);
-
-      const cleaned = raw.map((row) => {
-        const rate = parseFloat(row["Estimated Cost"] || 0) * 2.5;
-        return {
-          driver: row["Driver Name"] || "",
-          load: row["Load ID"] || "",
-          pu_location: row["Stop 1"] || "",
-          pu_date: excelDateToDate(row["Stop 1 Actual Departure Date"]),
-          pu_time: excelTimeToTime(row["Stop 1  Actual Arrival Time"]),
-          del_location: row["Stop 2"] || "",
-          del_date: excelDateToDate(row["Stop 2  Actual Arrival Date"]),
-          del_time: excelTimeToTime(row["Stop 2  Actual Arrival Time"]),
-          miles: row["Estimated Cost"] || 0,
-          rate: rate.toFixed(2),
-        };
-      });
-
-      setData(cleaned);
-    };
-    reader.readAsBinaryString(file);
+    setFileName(file.name);
+    const data = await file.arrayBuffer();
+    const wb = XLSX.read(data);
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(sheet);
+    setRows(json);
   };
+
+  const handleSave = () => {
+    if (rows.length) {
+      localStorage.setItem("loads", JSON.stringify(rows));
+      alert("Loads saved successfully ✅");
+    }
+  };
+
+  const handleDelete = (index) => {
+    const updated = rows.filter((_, i) => i !== index);
+    setRows(updated);
+    localStorage.setItem("loads", JSON.stringify(updated));
+  };
+
+  const filteredRows = rows.filter((row) => {
+    const matchDate = filterDate ? (row["PU Date"] || "").includes(filterDate) : true;
+    const matchDriver = filterDriver ? (row["Driver"] || "").toLowerCase().includes(filterDriver.toLowerCase()) : true;
+    return matchDate && matchDriver;
+  });
 
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold mb-4">Upload Load Report</h1>
-      <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="mb-4" />
+      <input type="file" accept=".xlsx,.xls" onChange={handleFile} className="mb-4" />
 
-      {data.length > 0 && (
-        <table className="min-w-full border text-sm">
+      {rows.length > 0 && (
+        <div className="mb-4 flex flex-col md:flex-row gap-4 items-start md:items-center">
+          <button
+            onClick={handleSave}
+            className="bg-blue-600 text-white px-4 py-2 rounded"
+          >
+            Save
+          </button>
+
+          <input
+            type="text"
+            placeholder="Filter by PU Date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="border p-2"
+          />
+
+          <input
+            type="text"
+            placeholder="Filter by Driver"
+            value={filterDriver}
+            onChange={(e) => setFilterDriver(e.target.value)}
+            className="border p-2"
+          />
+        </div>
+      )}
+
+      {filteredRows.length > 0 && (
+        <table className="w-full text-sm border">
           <thead>
-            <tr className="bg-gray-100 text-left">
-              <th className="border p-2">Driver</th>
-              <th className="border p-2">Load #</th>
-              <th className="border p-2">PU Location</th>
-              <th className="border p-2">PU Date</th>
-              <th className="border p-2">PU Time</th>
-              <th className="border p-2">Del Location</th>
-              <th className="border p-2">Del Date</th>
-              <th className="border p-2">Del Time</th>
-              <th className="border p-2">Miles</th>
-              <th className="border p-2">Rate ($)</th>
+            <tr className="bg-gray-100">
+              {Object.keys(filteredRows[0]).map((key) => (
+                <th key={key} className="border p-2">{key}</th>
+              ))}
+              <th className="border p-2">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {data.map((row, idx) => (
-              <tr key={idx} className="odd:bg-white even:bg-gray-50">
-                <td className="border px-2 py-1">{row.driver}</td>
-                <td className="border px-2 py-1">{row.load}</td>
-                <td className="border px-2 py-1">{row.pu_location}</td>
-                <td className="border px-2 py-1">{row.pu_date}</td>
-                <td className="border px-2 py-1">{row.pu_time}</td>
-                <td className="border px-2 py-1">{row.del_location}</td>
-                <td className="border px-2 py-1">{row.del_date}</td>
-                <td className="border px-2 py-1">{row.del_time}</td>
-                <td className="border px-2 py-1">{row.miles}</td>
-                <td className="border px-2 py-1">{row.rate}</td>
+            {filteredRows.map((row, i) => (
+              <tr key={i} className="odd:bg-white even:bg-gray-50">
+                {Object.values(row).map((val, j) => (
+                  <td key={j} className="border p-2">{val}</td>
+                ))}
+                <td className="border p-2 text-center">
+                  <button onClick={() => handleDelete(i)} className="text-red-500 font-bold">✕</button>
+                </td>
               </tr>
             ))}
           </tbody>
