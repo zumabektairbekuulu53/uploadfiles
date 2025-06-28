@@ -39,7 +39,7 @@ export default function LoadsPage() {
       Driver: row["Driver Name"] || "",
       "Load #": row["Load ID"] || "",
       "PU Location": row["Stop 1"] || "",
-      "PU Date": excelDateToJS(row["Stop 1 Actual Arrival Date"]),
+      "PU Date": excelDateToJS(row["Stop 1 Actual Departure Date"] || row["Stop 1 Actual Arrival Date"]),
       "PU Time": excelTimeToString(row["Stop 1 Actual Arrival Time"]),
       "Del Location": row["Stop 2"] || "",
       "Del Date": excelDateToJS(row["Stop 2 Actual Arrival Date"]),
