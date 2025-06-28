@@ -3,8 +3,8 @@ import * as XLSX from "xlsx";
 
 export default function LoadsPage() {
   const [loads, setLoads] = useState([]);
-  const [puDateFilter, setPuDateFilter] = useState("");
-  const [driverFilter, setDriverFilter] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDriver, setSelectedDriver] = useState("");
 
   useEffect(() => {
     const saved = localStorage.getItem("loads");
@@ -15,14 +15,6 @@ export default function LoadsPage() {
     localStorage.setItem("loads", JSON.stringify(loads));
   }, [loads]);
 
-  const parseExcelDate = (excelDate) => {
-    const epoch = new Date(Date.UTC(1899, 11, 30));
-    const days = Math.floor(excelDate);
-    const millisecondsPerDay = 86400000;
-    const date = new Date(epoch.getTime() + days * millisecondsPerDay);
-    return date;
-  };
-
   const handleFile = async (e) => {
     const file = e.target.files[0];
     const data = await file.arrayBuffer();
@@ -30,96 +22,132 @@ export default function LoadsPage() {
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const json = XLSX.utils.sheet_to_json(sheet);
 
-    const newLoads = json.map((row) => {
-      const puDate = parseExcelDate(row["Stop 1 Actual Arrival Date"]);
-      const delDate = parseExcelDate(row["Stop 2 Actual Arrival Date"]);
+    const parsed = json.map((row) => {
+      const parseExcelDate = (serial) => {
+        if (!serial) return null;
+        const utc_days = Math.floor(serial - 25569);
+        const utc_value = utc_days * 86400;
+        const date_info = new Date(utc_value * 1000);
+        const fractional_day = serial - Math.floor(serial) + 0.0000001;
+        let total_seconds = Math.floor(86400 * fractional_day);
+        const seconds = total_seconds % 60;
+        total_seconds -= seconds;
+        const hours = Math.floor(total_seconds / (60 * 60));
+        const minutes = Math.floor(total_seconds / 60) % 60;
+        date_info.setHours(hours);
+        date_info.setMinutes(minutes);
+        return date_info;
+      };
 
-      const puTimeFloat = row["Stop 1 Actual Arrival Time"];
-      const delTimeFloat = row["Stop 2 Actual Arrival Time"];
+      const formatDate = (date) => {
+        if (!date) return "—";
+        return date.toISOString().split("T")[0];
+      };
 
-      const puTime = typeof puTimeFloat === "number"
-        ? new Date(puDate.getTime() + puTimeFloat * 24 * 60 * 60 * 1000)
-        : null;
+      const formatTime = (date) => {
+        if (!date) return "—";
+        return date.toTimeString().split(" ")[0].slice(0, 5);
+      };
 
-      const delTime = typeof delTimeFloat === "number"
-        ? new Date(delDate.getTime() + delTimeFloat * 24 * 60 * 60 * 1000)
-        : null;
+      const puDateObj = parseExcelDate(row["Stop 1  Actual Arrival Date"]);
+      const delDateObj = parseExcelDate(row["Stop 2  Actual Arrival Date"]);
 
       return {
         driver: row["Driver Name"] || "",
-        loadId: row["Load #"] || "",
-        puLocation: row["PU Location"] || "",
-        puDate: puDate.toISOString().split("T")[0],
-        puTime: puTime ? puTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
-        delLocation: row["Del Location"] || "",
-        delDate: delDate.toISOString().split("T")[0],
-        delTime: delTime ? delTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "",
+        loadId: row["Load ID"] || "",
+        puLocation: row["Stop 1"] || "",
+        puDate: formatDate(puDateObj),
+        puTime: formatTime(puDateObj),
+        delLocation: row["Stop 2"] || "",
+        delDate: formatDate(delDateObj),
+        delTime: formatTime(delDateObj),
         miles: row["Estimated Distance"] || 0,
-        rate: row["Rate ($)"] || 0,
+        rate: row["Estimated Cost"] || 0,
       };
     });
 
-    setLoads(newLoads);
+    setLoads(parsed);
   };
 
-  const handleSave = () => {
+  const saveToLocal = () => {
     localStorage.setItem("loads", JSON.stringify(loads));
   };
 
-  const handleDelete = (index) => {
-    const updated = [...loads];
-    updated.splice(index, 1);
-    setLoads(updated);
+  const deleteRow = (index) => {
+    const newLoads = [...loads];
+    newLoads.splice(index, 1);
+    setLoads(newLoads);
   };
 
-  const filtered = loads.filter((l) => {
-    const matchDate = puDateFilter ? l.puDate === puDateFilter : true;
-    const matchDriver = driverFilter ? l.driver.toLowerCase().includes(driverFilter.toLowerCase()) : true;
-    return matchDate && matchDriver;
+  const filteredLoads = loads.filter((load) => {
+    const dateMatch = selectedDate ? load.puDate === selectedDate : true;
+    const driverMatch = selectedDriver ? load.driver === selectedDriver : true;
+    return dateMatch && driverMatch;
   });
 
   return (
     <div className="p-4">
       <h1 className="text-2xl font-bold mb-4">Upload Load Report</h1>
-      <input type="file" accept=".xlsx, .xls" onChange={handleFile} className="mb-2" />
-      <button onClick={handleSave} className="bg-blue-500 text-white px-3 py-1 ml-2 rounded">Save</button>
-      <input type="date" value={puDateFilter} onChange={(e) => setPuDateFilter(e.target.value)} className="border px-2 py-1 ml-2" />
-      <input type="text" placeholder="Filter by Driver" value={driverFilter} onChange={(e) => setDriverFilter(e.target.value)} className="border px-2 py-1 ml-2" />
-      <table className="table-auto border w-full mt-4 text-sm">
+      <input type="file" accept=".xlsx, .xls" onChange={handleFile} />
+      <button onClick={saveToLocal} className="ml-2 px-3 py-1 bg-blue-500 text-white rounded">
+        Save
+      </button>
+
+      <div className="mt-2 flex gap-2">
+        <input
+          type="text"
+          placeholder="mm/dd/yyyy"
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+        />
+        <input
+          type="text"
+          placeholder="Filter by Driver"
+          value={selectedDriver}
+          onChange={(e) => setSelectedDriver(e.target.value)}
+        />
+        <button
+          onClick={() => {
+            setSelectedDate("");
+            setSelectedDriver("");
+          }}
+        >
+          Clear
+        </button>
+      </div>
+
+      <table className="table-auto border-collapse w-full mt-4">
         <thead>
-          <tr className="bg-gray-200">
-            <th>Driver</th>
-            <th>Load #</th>
-            <th>PU Location</th>
-            <th>PU Date</th>
-            <th>PU Time</th>
-            <th>Del Location</th>
-            <th>Del Date</th>
-            <th>Del Time</th>
-            <th>Miles</th>
-            <th>Rate ($)</th>
-            <th>Actions</th>
+          <tr>
+            <th className="border px-2">Driver</th>
+            <th className="border px-2">Load #</th>
+            <th className="border px-2">PU Location</th>
+            <th className="border px-2">PU Date</th>
+            <th className="border px-2">PU Time</th>
+            <th className="border px-2">Del Location</th>
+            <th className="border px-2">Del Date</th>
+            <th className="border px-2">Del Time</th>
+            <th className="border px-2">Miles</th>
+            <th className="border px-2">Rate ($)</th>
+            <th className="border px-2">Actions</th>
           </tr>
         </thead>
         <tbody>
-          {filtered.map((load, index) => (
-            <tr key={index} className="border-b">
-              <td>{load.driver}</td>
-              <td>{load.loadId}</td>
-              <td>{load.puLocation}</td>
-              <td>{load.puDate}</td>
-              <td>{load.puTime}</td>
-              <td>{load.delLocation}</td>
-              <td>{load.delDate}</td>
-              <td>{load.delTime}</td>
-              <td>{load.miles}</td>
-              <td>{load.rate}</td>
-              <td>
-                <button
-                  onClick={() => handleDelete(index)}
-                  className="text-red-600 hover:text-red-800"
-                >
-                  ✕
+          {filteredLoads.map((load, index) => (
+            <tr key={index}>
+              <td className="border px-2">{load.driver}</td>
+              <td className="border px-2">{load.loadId}</td>
+              <td className="border px-2">{load.puLocation}</td>
+              <td className="border px-2">{load.puDate}</td>
+              <td className="border px-2">{load.puTime}</td>
+              <td className="border px-2">{load.delLocation}</td>
+              <td className="border px-2">{load.delDate}</td>
+              <td className="border px-2">{load.delTime}</td>
+              <td className="border px-2">{load.miles}</td>
+              <td className="border px-2">{load.rate}</td>
+              <td className="border px-2">
+                <button onClick={() => deleteRow(index)} className="text-red-600">
+                  ×
                 </button>
               </td>
             </tr>
